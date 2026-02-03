@@ -5,7 +5,7 @@ echo "Welcome to the NixOS installation!"
 echo "Before we start please make sure that you have created the appropriate disk layout (EFI + root partition) and mounted them to /mnt"
 read -p "Continue? (Y/N): " CONFIRM && [[ $CONFIRM == [yY] || $CONFIRM == [yY][eE][sS] ]] || exit 1
 if ! mountpoint -q /mnt; then
-  echo "/mnt is not a mount point!"
+  echo "/mnt is not a mount point! Please mount the target drive to /mnt."
   exit 1
 fi
 
@@ -33,19 +33,24 @@ echo "Step 2) Cloning the target repository (nixos-config)"
 export GIT_SSH_COMMAND='ssh -i id_ed25519_github_tmp -o IdentitiesOnly=yes'
 nix-shell -p git --run "git clone git@github.com:andreasbrouwer/nixos-config.git ./nixos-config"
 
-echo "Step 3) Building a minimal installation (note: make sure to have enough space on tmpfs)"
-# # check if there is at least 4 GB memory available
-# if [[ $(grep -oP '^MemTotal:\s+\K\d+' /proc/meminfo) -gt 3906250 ]]; then
-# 	echo "yep"
-# else
-# 	echo "nope"
-# fi
-sudo mount -o remount,size=4G /nix/.rw-store
+echo "Step 3) Increasing the size of /nix/.rw-store"
+# check if there is at least 4 GB memory available
+if [[ $(grep -oP '^MemTotal:\s+\K\d+' /proc/meminfo) -gt 3906250 ]]; then
+  if [[ $(df -k /nix/.rw-store | tail -1 | awk '{print $2}') -gt 3906250 ]]; then
+    # do nothing, there should be enough space available on tmpfs
+  else
+    echo "Increasing the size of /nix/.rw-store to 4GB"
+    sudo mount -o remount,size=4G /nix/.rw-store
+  fi
+else
+  echo "The system has less than 4GB memory available. There might not be enough space to hold the build result. If not, please remount /nix/.rw-store to a physical drive."
+fi
+
+echo "Step 4) Building a minimal installation (note: make sure to have enough space on tmpfs)"
 
 nix build --extra-experimental-features "nix-command flakes" ./nixos-config#nixosConfigurations.minimal.config.system.build.toplevel
 
-echo "Step 4) Installing NixOS"
+echo "Step 5) Installing NixOS"
 sudo nixos-install --root /mnt --system ./result
 
 echo "Bootstrap process completed! You can now reboot into the minimal installation and proceed from there."
-
