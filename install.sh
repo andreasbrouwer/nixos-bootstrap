@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#set -e # exit after any failure
+# set -euo pipefail # exit after any failure
 
 echo "Welcome to the NixOS installation!"
 echo "Before we start please make sure that you have created the appropriate disk layout (EFI + root partition) and mounted them to /mnt"
@@ -36,8 +36,8 @@ nix-shell -p git --run "git clone git@github.com:andreasbrouwer/nixos-config.git
 echo "Step 3) Increasing the size of /nix/.rw-store"
 # check if there is at least 4 GB memory available
 if [[ $(grep -oP '^MemTotal:\s+\K\d+' /proc/meminfo) -gt 3906250 ]]; then
-  if [[ $(df -k /nix/.rw-store | tail -1 | awk '{print $2}') -gt 3906250 ]]; then
-    # do nothing, there should be enough space available on tmpfs
+  if [[ $(df -k /nix/.rw-store | tail -1 | tr -s ' ' | cut -d' ' -f2) -gt 3906250 ]]; then
+    : # do nothing, there should be enough space available on tmpfs
   else
     echo "Increasing the size of /nix/.rw-store to 4GB"
     sudo mount -o remount,size=4G /nix/.rw-store
@@ -54,3 +54,4 @@ echo "Step 5) Installing NixOS"
 sudo nixos-install --root /mnt --system ./result
 
 echo "Bootstrap process completed! You can now reboot into the minimal installation and proceed from there."
+
